@@ -4,6 +4,8 @@
 from typing import Any
 from pandas import DataFrame
 import numpy as np
+import random
+import copy
 
 def echo(*args): 
     print(*args)
@@ -202,16 +204,16 @@ hmm = HiddenMarkovModell(np.array([[0.6, 0.4], [0.0, 1.0]]),
 # print(hmm.interpret(np.array([0, 0, 1]), 2))
 
 
-hmm2 = HiddenMarkovModell(np.array([[0.5, 0.5], [0.5, 0.5]]),
-    np.array([1.0, 0.0]),
-    np.array([[0.8, 0.2], [0.2, 0.8]]))
+# hmm2 = HiddenMarkovModell(np.array([[0.5, 0.5], [0.5, 0.5]]),
+#     np.array([1.0, 0.0]),
+#     np.array([[0.8, 0.2], [0.2, 0.8]]))
 
-print(hmm2.evaluate(np.array([0, 0, 1]), 2, 0))
-print(hmm2.back_evaluate(np.array([0, 0, 1]), 0, 0))
-print(hmm2.interpret(np.array([0, 0, 1]), 2))
-for i in range(7):
-    print(f"after: {i} Iterations:", hmm2.A)
-    hmm2.train(np.array([0, 1, 1]))
+# print(hmm2.evaluate(np.array([0, 0, 1]), 2, 0))
+# print(hmm2.back_evaluate(np.array([0, 0, 1]), 0, 0))
+# print(hmm2.interpret(np.array([0, 0, 1]), 2))
+# for i in range(7):
+#     print(f"after: {i} Iterations:", hmm2.A)
+#     hmm2.train(np.array([0, 1, 1]))
 
 
 # hmm3 = HiddenMarkovModell(np.array([[0.0, 1.0], [0.0, 1.0]]),
@@ -225,3 +227,86 @@ for i in range(7):
 # print("before: ", hmm3.A)
 # hmm3.train(np.array([0, 1, 1]))
 # print("after: ", hmm3.A)
+
+def get_list_type(list_):
+    if len(list_) == 0:
+        return Any
+    current_type = type(list_[0])
+    if all(type(i) == current_type for i in list_):
+        return current_type
+    return Any
+
+def ultimate_equal(x, y):
+    return len(x) == len(y) and all(len(x[i]) == len(y[i]) and np.array_equal(x[i], y[i]) for i in range(len(x)))
+
+
+class KMeans:
+    def __init__(self, data: list[Any]):
+        self.data = np.array(data, dtype=float)
+        self.centers = np.array([])
+
+    def init(self, k: int):
+        # Initialize
+        mask = np.zeros(len(self.data), dtype= bool)
+
+        for i in np.random.choice(len(self.data), k, replace = False):
+            mask[i] = True
+        
+        copy = self.data[mask, ...]
+        self.clusters = [[np.copy(i)] for i in copy]
+        self.centers = copy
+
+        mask = np.logical_not(mask)
+
+        # Einordnung
+        for i in self.data[mask, ...]:
+            distances = np.linalg.norm(np.subtract(self.centers, i), axis= 1)
+            index = np.argmin(distances)
+            self.clusters[index].append(i)
+
+        # Berechnung
+        for (index, i) in enumerate(self.clusters):
+            self.centers[index] = sum(i) / len(i)
+
+
+    def iteration(self, k: int):
+        self.clusters = [[] for i in range(k)]
+
+        # Einordnung
+        for i in self.data:
+            distances = np.linalg.norm(np.subtract(self.centers, i), axis= 1)
+            index = np.argmin(distances)
+            self.clusters[index].append(i)
+
+        # Berechnung
+        for (index, i) in enumerate(self.clusters):
+            self.centers[index] = sum(i) / len(i)
+
+    def run(self, k: int, verbose = False, init = True):
+        if init:
+            self.init(k)
+        last_clusters = copy.deepcopy(self.clusters)
+
+        self.iteration(k)
+        current_clusters = copy.deepcopy(self.clusters)
+        i = 1
+        while not ultimate_equal(last_clusters, current_clusters):
+            last_clusters = current_clusters
+            if verbose:
+                print(current_clusters, self.centers)
+            self.iteration(k)
+            current_clusters = copy.deepcopy(self.clusters)
+            i += 1
+        if verbose: 
+            print(current_clusters, self.centers)
+            print(f"{i} Durchläufe")
+
+class KNearest:
+    def __init__(self):
+        pass
+
+
+
+km = KMeans([[2, 10], [2, 5], [8, 4], [5, 8], [7, 5], [6, 4], [1, 2], [4, 9]])
+km.run(3, True)
+
