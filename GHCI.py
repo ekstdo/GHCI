@@ -6,6 +6,7 @@ from pandas import DataFrame
 import numpy as np
 import random
 import copy
+from collections import Counter
 
 def echo(*args): 
     print(*args)
@@ -301,12 +302,104 @@ class KMeans:
             print(current_clusters, self.centers)
             print(f"{i} Durchläufe")
 
-class KNearest:
-    def __init__(self):
-        pass
-
-
 
 km = KMeans([[2, 10], [2, 5], [8, 4], [5, 8], [7, 5], [6, 4], [1, 2], [4, 9]])
 km.run(3, True)
 
+
+class KNearest:
+    def __init__(self, clusters):
+        self.clusters = clusters
+
+    def run(self, val, k: int, verbose = False) -> int:
+        c = [sorted(((j, np.linalg.norm(j - val)) for j in i), reverse=True, key= lambda x: x[1]) for i in self.clusters]
+        result = []
+        counter = Counter()
+        for i in range(k):
+            index = min(range(len(c)), key = lambda x:  c[x][-1][1] if len(c[x]) > 0 else float("inf"))
+            result.append((index, c[index].pop()))
+            if verbose:
+                print(index, result)
+
+        for i in result:
+            if i[0] in counter:
+                counter[i[0]] += 1
+            else:
+                counter[i[0]] = 1
+
+        return counter.most_common(1)[0][0]
+                
+
+
+
+
+kn = KNearest(km.clusters)
+print(kn.run(np.array([2, 5]), 3, True))
+
+def relu(x):
+    x[x < 0] = 0
+
+def sigmoid(x):
+    return 1/(1 + np.exp(-x))
+
+class NeuralNetwork:
+    weights: list[np.ndarray]
+    bias: list[np.ndarray]
+
+    def __init__(self, weights: list[np.ndarray] = [], bias: list[np.ndarray] = [], activation_functions = None):
+        self.weights = weights
+        self.bias = bias
+        if type(activation_functions) is list:
+            self.activation_functions = activation_functions
+        elif activation_functions is None:
+            self.activation_functions = [relu for i in range(len(self.bias))]
+        else:
+            self.activation_functions = [activation_functions for i in range(len(self.bias))]
+
+
+    def random_init(self, shape: list[int]):
+        for i in range(len(shape) - 1):
+            self.weights.append(np.random.random_sample((shape[i], shape[i + 1])))
+            self.bias.append(np.random.random_sample((shape[i + 1], )))
+
+    def evaluate(self, input_: np.ndarray, verbose = False):
+        between = input_
+        for i in range(len(self.weights)):
+            between = np.matmul(between, self.weights[i]) + self.bias[i]
+            res = self.activation_functions[i](between)
+            if res is not None:
+                between = res
+            if verbose:
+                print(f"Layer {i}: {between}")
+        return between
+
+    def backpropagation(self, data, should_result, is_result):
+        dif_weights = []
+        dif_bias = []
+
+        delta_neuron = [is_result * (1 - is_result) * (should_result - is_result)]
+
+        for i in range(len(self.bias) - 1):
+            delta_neuron.append(is_result * (1 - is_result) * sum(delta_neuron[k] * self.weights[k] for k in range(len(self.bias[len(self.bias) - 1 - i]))))
+
+        print(delta_neuron)
+
+
+# Perzeptron
+
+# nn = NeuralNetwork([np.array([0.1, .1])], [np.array([0])])
+
+# print(nn.evaluate(np.array([0., 0.])))
+# print(nn.evaluate(np.array([0., 1.])))
+# print(nn.evaluate(np.array([1., 0.])))
+# print(nn.evaluate(np.array([1., 1.])))
+
+
+nn2 = NeuralNetwork([
+    np.array([[0.5, 0.9], [0.4, 1.0]]), # weights layer 1
+    np.array([-1.2, 1.1])], # weights layer 2
+
+    [np.array([-0.8, 0.1]), # bias layer 1
+        np.array([-0.3])], sigmoid)
+
+print(nn2.evaluate(np.array([1., 1.]), True))
