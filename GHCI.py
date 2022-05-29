@@ -345,10 +345,12 @@ def sigmoid(x):
 class NeuralNetwork:
     weights: list[np.ndarray]
     bias: list[np.ndarray]
+    betweens: list[np.ndarray]
 
     def __init__(self, weights: list[np.ndarray] = [], bias: list[np.ndarray] = [], activation_functions = None):
         self.weights = weights
         self.bias = bias
+        self.betweens = []
         if type(activation_functions) is list:
             self.activation_functions = activation_functions
         elif activation_functions is None:
@@ -365,25 +367,49 @@ class NeuralNetwork:
     def evaluate(self, input_: np.ndarray, verbose = False):
         between = input_
         for i in range(len(self.weights)):
+            self.betweens.append(between)
             between = np.matmul(between, self.weights[i]) + self.bias[i]
             res = self.activation_functions[i](between)
             if res is not None:
                 between = res
             if verbose:
                 print(f"Layer {i}: {between}")
+        self.betweens.append(between)
         return between
 
-    def backpropagation(self, data, should_result, is_result):
+    def backpropagation(self, alpha: float, data: np.ndarray, should_result, is_result, verbose = False):
         dif_weights = []
         dif_bias = []
 
         delta_neuron = [is_result * (1 - is_result) * (should_result - is_result)]
 
+
+        # TODO: Only accounts for Sigmoid function, stress
         for i in range(len(self.bias) - 1):
-            delta_neuron.append(is_result * (1 - is_result) * sum(delta_neuron[k] * self.weights[k] for k in range(len(self.bias[len(self.bias) - 1 - i]))))
+            rev_i = len(self.bias) - 1 - i
+            k_iter = range(len(self.bias[rev_i]))
+            was_result = self.betweens[rev_i]
+            delta_neuron.append(was_result * (1 - was_result) * sum(delta_neuron[i][k] * self.weights[rev_i][:, k] for k in k_iter))
 
-        print(delta_neuron)
+        delta_neuron.reverse()
 
+        if verbose:
+            print(delta_neuron)
+
+
+        dif_weights.append(alpha * np.outer(data[i], delta_neuron[i]))
+        dif_bias.append(alpha * (-1.) * delta_neuron[0])
+        for i in range(1, len(self.bias)):
+            dif_weights.append(alpha * np.outer(self.betweens[i], delta_neuron[i]))
+            dif_bias.append(alpha * (-1.) * delta_neuron[i])
+
+        if verbose:
+            print("Delta weights: ",  dif_weights)
+            print("Delta bias: ",  dif_bias)
+
+        for i in range(len(self.bias)):
+            self.weights[i] += dif_weights[i]
+            self.bias[i] += dif_bias[i]
 
 # Perzeptron
 
@@ -395,11 +421,17 @@ class NeuralNetwork:
 # print(nn.evaluate(np.array([1., 1.])))
 
 
+# neurales Netzwerk Beispiel
+
 nn2 = NeuralNetwork([
     np.array([[0.5, 0.9], [0.4, 1.0]]), # weights layer 1
-    np.array([-1.2, 1.1])], # weights layer 2
+    np.array([[-1.2], [1.1]])], # weights layer 2
 
     [np.array([-0.8, 0.1]), # bias layer 1
         np.array([-0.3])], sigmoid)
 
-print(nn2.evaluate(np.array([1., 1.]), True))
+eval_result = nn2.evaluate(np.array([1., 1.]), True)
+
+print(eval_result)
+
+print(nn2.backpropagation(0.1, np.array([1., 1.]), np.array([0. ]), eval_result, True))
