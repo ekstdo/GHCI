@@ -30,9 +30,13 @@ class NaiveBayes:
             sub_frame = resulting_frame[resulting_frame[j] == attributes[i]]
             sub_len = sub_frame.shape[0]
             if sub_len == 0:
-                value *= m / self.table[j].nunique() / (m + queried_len)
+                factor = m / self.table[j].nunique() / (m + queried_len)
+                print(factor)
+                value *= factor
             else:
-                value *= sub_len / queried_len
+                factor = sub_len / queried_len
+                print(factor)
+                value *= factor
         return value
 
     def interpret(self, query: str, attributes: list[Any], m: int, verbose: bool = False):
@@ -64,6 +68,28 @@ data = DataFrame(
 
 
 nb = NaiveBayes(data)
+
+data2 = DataFrame([
+    ["sonnig", "heiß", "schwach", "ja"],
+    ["bedeckt", "kühl", "schwach", "nein"],
+    ["sonnig", "kühl", "schwach", "nein"],
+    ["Regen", "mild", "stark", "ja"],
+    ["bedeckt", "heiß", "stark", "ja"],
+    ["Regen", "kühl", "schwach", "nein"],
+    ["bedeckt", "heiß", "stark", "ja"],
+    ["sonnig", "mild", "schwach", "ja"],
+    ["bedeckt", "mild", "schwach", "nein"],
+    ["sonnig", "kühl", "stark", "nein"]
+], columns=["Vorhersage", "Temperatur", "Wind", "Tennis?"])
+
+nb2 = NaiveBayes(data2)
+
+print(nb2.evaluate("Tennis?", "ja", ["bedeckt", "heiß", "schwach"], 1))
+print(nb2.evaluate("Tennis?", "nein", ["bedeckt", "heiß", "schwach"], 1))
+
+print(nb2.evaluate("Tennis?", "ja", ["sonnig", "mild", "schwach"], 1))
+print(nb2.evaluate("Tennis?", "nein", ["sonnig", "mild", "schwach"], 1))
+
 
 # nb.evaluate("Erfahrung", "positiv", ["Jenaplan", "kooperativ", "rational"], 12)
 # print(nb.interpret("Erfahrung", ["Jenaplan", "kooperativ", "rational"], 12, True))
@@ -130,7 +156,7 @@ class HiddenMarkovModell:
             return res
         return beta(t, state)
 
-    def interpret(self, observations: np.ndarray, t: int):
+    def interpret(self, observations: np.ndarray, t: int, verbose = False):
         results = np.full((t + 1, len(self.A)), -1.)
         def interpret_(t: int, state: int):
             if results[t][state] != -1:
@@ -146,6 +172,9 @@ class HiddenMarkovModell:
 
         for i in range(len(self.A)):
             interpret_(t, i)
+
+        if verbose:
+            print(results)
 
         observation_chain = []
         for i in results:
@@ -229,6 +258,10 @@ hmm = HiddenMarkovModell(np.array([[0.6, 0.4], [0.0, 1.0]]),
 # hmm3.train(np.array([0, 1, 1]))
 # print("after: ", hmm3.A)
 
+# hmm4 = HiddenMarkovModell(np.array([[0.7, 0.3], [0.6, 0.4]]), np.array([0.9, 0.1]), np.array([[0.8, 0.2], [0.3, 0.7]]))
+# print(hmm4.evaluate(np.array([1, 0, 1]), 2, True))
+# print(hmm4.interpret(np.array([0, 1, 0]), 2, True))
+
 def get_list_type(list_):
     if len(list_) == 0:
         return Any
@@ -244,7 +277,8 @@ def ultimate_equal(x, y):
 class KMeans:
     def __init__(self, data: list[Any]):
         self.data = np.array(data, dtype=float)
-        self.centers = np.array([])
+        self.centers = np.array([], dtype=float)
+        self.clusters = []
 
     def init(self, k: int):
         # Initialize
@@ -281,7 +315,7 @@ class KMeans:
 
         # Berechnung
         for (index, i) in enumerate(self.clusters):
-            self.centers[index] = sum(i) / len(i)
+            self.centers[index] =  sum(i) / len(i)
 
     def run(self, k: int, verbose = False, init = True):
         if init:
@@ -294,18 +328,21 @@ class KMeans:
         while not ultimate_equal(last_clusters, current_clusters):
             last_clusters = current_clusters
             if verbose:
-                print(current_clusters, self.centers)
+                print("KMeans: ", current_clusters, self.centers)
             self.iteration(k)
             current_clusters = copy.deepcopy(self.clusters)
             i += 1
         if verbose: 
-            print(current_clusters, self.centers)
+            print("KMeans: ", current_clusters, self.centers)
             print(f"{i} Durchläufe")
 
 
-km = KMeans([[2, 10], [2, 5], [8, 4], [5, 8], [7, 5], [6, 4], [1, 2], [4, 9]])
-km.run(3, True)
+# km = KMeans([[2, 10], [2, 5], [8, 4], [5, 8], [7, 5], [6, 4], [1, 2], [4, 9]])
+# km.run(3)
 
+# km2 = KMeans([[1, 8, 2], [9, 7, 3], [5, 1, 2], [2, 4, 5], [1, 4, 4], [8, 4, 3]])
+# km2.centers = np.array([[1, 8, 2], [1, 4, 4]], dtype=float)
+# km2.run(2, True, False)
 
 class KNearest:
     def __init__(self, clusters):
@@ -333,8 +370,8 @@ class KNearest:
 
 
 
-kn = KNearest(km.clusters)
-print(kn.run(np.array([2, 5]), 3, True))
+# kn = KNearest(km.clusters)
+# print(kn.run(np.array([2, 5]), 3, True))
 
 def relu(x):
     x[x < 0] = 0
@@ -423,15 +460,26 @@ class NeuralNetwork:
 
 # neurales Netzwerk Beispiel
 
-nn2 = NeuralNetwork([
-    np.array([[0.5, 0.9], [0.4, 1.0]]), # weights layer 1
-    np.array([[-1.2], [1.1]])], # weights layer 2
+# nn2 = NeuralNetwork([
+#     np.array([[0.5, 0.9], [0.4, 1.0]]), # weights layer 1
+#     np.array([[-1.2], [1.1]])], # weights layer 2
 
-    [np.array([-0.8, 0.1]), # bias layer 1
-        np.array([-0.3])], sigmoid)
+#     [np.array([-0.8, 0.1]), # bias layer 1
+#         np.array([-0.3])], sigmoid)
 
-eval_result = nn2.evaluate(np.array([1., 1.]), True)
+# eval_result = nn2.evaluate(np.array([1., 1.]), True)
 
-print(eval_result)
+# print(eval_result)
 
-print(nn2.backpropagation(0.1, np.array([1., 1.]), np.array([0. ]), eval_result, True))
+# print(nn2.backpropagation(0.1, np.array([1., 1.]), np.array([0. ]), eval_result, True))
+
+# nn3 = NeuralNetwork([
+#     np.array([[-2, 1], [2, 1]]),
+#     np.array([[1.5], [0.5]])
+#     ], [np.array([1.5, -0.5]), np.array([0.0])], sigmoid)
+
+# eval_result2 = nn3.evaluate(np.array([1.0, 0.0]), True)
+
+# print(eval_result2)
+
+# print(nn3.backpropagation(0.75, np.array([1.0, 0.0]), np.array([1.]), eval_result2, True ))
